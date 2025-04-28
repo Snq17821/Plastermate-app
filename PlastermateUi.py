@@ -2,9 +2,9 @@ import streamlit as st
 import numpy as np
 import plotly.graph_objects as go
 from scipy.ndimage import gaussian_filter
+import time
 
-# --- Session State Management ---
-# Initialize state variables
+# --- Session State Initialization ---
 for key, default in {
     "saved_scans": {},
     "scan_counter": 1,
@@ -21,11 +21,12 @@ def generate_heatmap():
     x = np.linspace(0, wall_width, grid_points)
     y = np.linspace(0, wall_height, grid_points)
     X, Y = np.meshgrid(x, y)
-    pattern = np.sin(X * np.random.uniform(0.5, 1.5)) + np.cos(Y * np.random.uniform(0.5, 1.5))
     noise = np.random.rand(grid_points, grid_points) * np.random.uniform(0.3, 0.8)
+    pattern = np.sin(X * np.random.uniform(0.5, 1.5)) + np.cos(Y * np.random.uniform(0.5, 1.5))
     data = gaussian_filter(pattern + noise, sigma=2)
     fig = go.Figure(go.Heatmap(
-        z=data, x=x, y=y, colorscale="Viridis", colorbar=dict(title="Thickness (mm)")
+        z=data, x=x, y=y, colorscale="Viridis",
+        colorbar=dict(title="Thickness (mm)")
     ))
     fig.update_layout(
         title="Wall Plastering Heatmap (10m x 10m)",
@@ -35,9 +36,9 @@ def generate_heatmap():
     )
     return fig
 
-# --- Callback for Saving and Selecting ---
+# --- Callback: Select Saved Scan ---
 def on_select_saved():
-    sel = st.session_state.saved_scan_selectbox
+    sel = st.session_state.get("saved_scan_selectbox", "")
     if sel and sel in st.session_state.saved_scans:
         st.session_state.selected_saved_scan_name = sel
         st.session_state.view_mode = "saved"
@@ -46,7 +47,7 @@ def on_select_saved():
         st.session_state.selected_saved_scan_name = None
         st.session_state.view_mode = "none"
 
-# --- App Configuration ---
+# --- Page Config ---
 st.set_page_config(page_title="Plastermate", layout="wide")
 
 # --- Sidebar ---
@@ -54,7 +55,7 @@ with st.sidebar:
     st.title("🧱 Plastermate")
     st.header("Controls")
 
-    # Run New Analysis
+    # New Analysis
     if st.button("▶️ New Analysis", type="primary", use_container_width=True):
         st.session_state.latest_run_figure = generate_heatmap()
         st.session_state.view_mode = "latest"
@@ -63,13 +64,12 @@ with st.sidebar:
     st.markdown("---")
     st.header("Saved Scans")
 
-    # Saved scans dropdown
     if st.session_state.saved_scans:
         names = list(st.session_state.saved_scans.keys())
         options = [""] + names
-        # Determine selectbox index (0 = placeholder)
-        idx = names.index(st.session_state.selected_saved_scan_name) + 1 \
-            if st.session_state.selected_saved_scan_name in names else 0
+        idx = 0
+        if st.session_state.selected_saved_scan_name in names:
+            idx = names.index(st.session_state.selected_saved_scan_name) + 1
         st.selectbox(
             "", options,
             index=idx,
@@ -78,47 +78,63 @@ with st.sidebar:
             format_func=lambda v: "Choose a scan..." if v == "" else v,
             help="Select or clear a saved scan"
         )
-
-        # Delete button
         if st.session_state.selected_saved_scan_name:
-            if st.button(f"🗑️ Delete {st.session_state.selected_saved_scan_name}", use_container_width=True):
+            if st.button(
+                f"🗑️ Delete {st.session_state.selected_saved_scan_name}", use_container_width=True
+            ):
                 del st.session_state.saved_scans[st.session_state.selected_saved_scan_name]
-                st.success("Deleted successfully.")
+                # Delete animation
+                st.snow()
+                time.sleep(0.5)
+                st.success("Scan deleted.")
                 st.session_state.view_mode = "none"
                 st.session_state.selected_saved_scan_name = None
                 st.rerun()
     else:
-        st.info("No scans saved yet.")
+        st.info("No saved scans.")
 
-# --- Main Display ---
+# --- Main Area ---
 with st.container():
     mode = st.session_state.view_mode
-    # Latest analysis view
+
+    # Latest Analysis View
     if mode == "latest" and st.session_state.latest_run_figure:
         st.subheader("Latest Heatmap")
         st.plotly_chart(st.session_state.latest_run_figure, use_container_width=True)
 
+        # Save Section
         with st.expander("💾 Save This Scan", expanded=True):
-            scan_name = st.text_input(
+            name_input = st.text_input(
                 "Save As", key="custom_scan_name_input",
                 placeholder=f"Scan {st.session_state.scan_counter}"
             )
-            st.write("")
-            if st.button("Save This Scan", type="primary", use_container_width=True, key="save_btn"):
-                name = scan_name.strip() or f"Scan {st.session_state.scan_counter}"
-                st.session_state.saved_scans[name] = st.session_state.latest_run_figure
+            if st.button(
+                "Save This Scan", type="primary", use_container_width=True, key="save_btn"
+            ):
+                final_name = name_input.strip() or f"Scan {st.session_state.scan_counter}"
+                # Progress animation
+                progress = st.progress(0)
+                for i in range(1, 101):
+                    time.sleep(0.005)
+                    progress.progress(i)
+                progress.empty()
+                # Save
+                st.session_state.saved_scans[final_name] = st.session_state.latest_run_figure
                 st.session_state.scan_counter += 1
                 st.session_state.view_mode = "saved"
-                st.session_state.selected_saved_scan_name = name
-                st.success(f"Saved as '{name}' 🎉")
+                st.session_state.selected_saved_scan_name = final_name
+                st.balloons()
+                st.success(f"Successfully saved as '{final_name}'!")
                 st.rerun()
 
-    # Saved scan view
+    # Saved Scan View
     elif mode == "saved" and st.session_state.selected_saved_scan_name:
-        name = st.session_state.selected_saved_scan_name
-        st.subheader(f"Saved Scan: {name}")
-        st.plotly_chart(st.session_state.saved_scans[name], use_container_width=True)
+        sel_name = st.session_state.selected_saved_scan_name
+        with st.spinner("Loading saved scan..."):
+            time.sleep(0.5)
+        st.subheader(f"Saved Scan: {sel_name}")
+        st.plotly_chart(st.session_state.saved_scans[sel_name], use_container_width=True)
 
-    # Placeholder
+    # Placeholder View
     else:
         st.info("Run a new analysis or select a saved scan to view.")
