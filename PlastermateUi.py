@@ -83,10 +83,12 @@ with st.sidebar:
                 f"🗑️ Delete {st.session_state.selected_saved_scan_name}", use_container_width=True
             ):
                 del st.session_state.saved_scans[st.session_state.selected_saved_scan_name]
-                # Delete animation
+                # Snow animation
                 st.snow()
+                # Brief pause to show effect
                 time.sleep(0.5)
                 st.success("Scan deleted.")
+                # Reset view
                 st.session_state.view_mode = "none"
                 st.session_state.selected_saved_scan_name = None
                 st.rerun()
@@ -121,10 +123,13 @@ with st.container():
                 # Save
                 st.session_state.saved_scans[final_name] = st.session_state.latest_run_figure
                 st.session_state.scan_counter += 1
-                st.session_state.view_mode = "saved"
-                st.session_state.selected_saved_scan_name = final_name
+                # Celebration
                 st.balloons()
                 st.success(f"Successfully saved as '{final_name}'!")
+                # Reset to default
+                st.session_state.view_mode = "none"
+                st.session_state.selected_saved_scan_name = None
+                st.session_state.latest_run_figure = None
                 st.rerun()
 
     # Saved Scan View
